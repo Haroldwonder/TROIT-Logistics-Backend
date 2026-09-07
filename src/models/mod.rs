@@ -1,14 +1,23 @@
+use crate::blockchain::SharedBlockchainService;
 use crate::config::AppConfig;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Type};
 use uuid::Uuid;
 
+pub mod inspection;
+pub mod notification;
+pub mod order_history;
+pub mod seller;
+pub mod subscription;
+pub mod wishlist;
+
 /// Application Shared State
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
     pub config: AppConfig,
+    pub blockchain: SharedBlockchainService,
 }
 
 /// Platform user roles supported by TROIT Logistics

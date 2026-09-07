@@ -27,6 +27,9 @@ pub enum AppError {
     #[error("Validation Error: {0}")]
     ValidationError(String),
 
+    #[error("Blockchain Error: {0}")]
+    BlockchainError(String),
+
     #[error("Internal Server Error")]
     InternalServerError(String),
 }
@@ -47,6 +50,13 @@ impl IntoResponse for AppError {
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg),
             AppError::ValidationError(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg),
+            AppError::BlockchainError(msg) => {
+                tracing::error!("Blockchain Error: {}", msg);
+                (
+                    StatusCode::BAD_GATEWAY,
+                    format!("Blockchain Service Failure: {}", msg),
+                )
+            }
             AppError::InternalServerError(internal_msg) => {
                 // Log internal details safely on server side
                 tracing::error!("Internal Server Error: {}", internal_msg);
