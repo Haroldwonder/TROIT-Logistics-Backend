@@ -1,15 +1,22 @@
 mod auth;
+mod blockchain;
 mod config;
 mod db;
 mod errors;
+mod inspections;
 mod middleware;
 mod models;
+mod notifications;
 mod orders;
 mod products;
 mod routes;
 mod seed;
+mod seller;
 mod services;
+mod subscriptions;
+mod trust;
 mod utils;
+mod wishlist;
 
 use config::AppConfig;
 use db::init_db_pool;
@@ -43,10 +50,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. Connect to PostgreSQL and run automatic SQLx migrations
     let db = init_db_pool(&config.database_url).await?;
 
-    // 4. Create AppState
+    // 4. Initialize Blockchain Service
+    let blockchain_service = blockchain::BlockchainService::new(&config)?;
+    let blockchain = std::sync::Arc::new(blockchain_service);
+
+    // 5. Create AppState
     let state = AppState {
         db,
         config: config.clone(),
+        blockchain,
     };
 
     // 5. Configure CORS middleware for local frontend development

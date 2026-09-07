@@ -15,6 +15,12 @@ pub struct Order {
     pub status: String,
     pub payment_status: String,
     pub delivery_status: String,
+    pub escrow_id: Option<i64>,
+    pub escrow_state: String,
+    pub blockchain_tx_hash: Option<String>,
+    pub funding_tx_hash: Option<String>,
+    pub release_tx_hash: Option<String>,
+    pub refund_tx_hash: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -35,6 +41,38 @@ pub struct PickupInspection {
 pub struct CreateOrderRequest {
     pub product_id: Uuid,
     pub quantity: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
+pub struct FundOrderRequest {
+    pub tx_hash: Option<String>,
+    pub signed_tx_xdr: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
+pub struct ConfirmDeliveryRequest {
+    pub tx_hash: Option<String>,
+    pub signed_tx_xdr: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RefundOrderRequest {
+    pub reason: Option<String>,
+    pub tx_hash: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DisputeOrderRequest {
+    pub reason: String,
+    pub tx_hash: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResolveDisputeRequest {
+    pub release_to_seller: bool,
+    pub tx_hash: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +98,12 @@ pub struct OrderResponse {
     pub status: String,
     pub payment_status: String,
     pub delivery_status: String,
+    pub escrow_id: Option<i64>,
+    pub escrow_state: String,
+    pub blockchain_tx_hash: Option<String>,
+    pub funding_tx_hash: Option<String>,
+    pub release_tx_hash: Option<String>,
+    pub refund_tx_hash: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -76,8 +120,23 @@ impl Order {
             status: self.status.clone(),
             payment_status: self.payment_status.clone(),
             delivery_status: self.delivery_status.clone(),
+            escrow_id: self.escrow_id,
+            escrow_state: self.escrow_state.clone(),
+            blockchain_tx_hash: self.blockchain_tx_hash.clone(),
+            funding_tx_hash: self.funding_tx_hash.clone(),
+            release_tx_hash: self.release_tx_hash.clone(),
+            refund_tx_hash: self.refund_tx_hash.clone(),
             created_at: self.created_at,
             updated_at: self.updated_at,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrderStatusHistoryResponse {
+    pub id: Uuid,
+    pub order_id: Uuid,
+    pub status: String,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
 }

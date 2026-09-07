@@ -113,7 +113,7 @@ pub async fn seed_demo_data_handler(
             r#"
             INSERT INTO products (seller_id, name, description, price, condition, stock, verification_status)
             VALUES ($1, $2, $3, $4, $5, $6, 'VERIFIED')
-            RETURNING id, seller_id, name, description, price, condition, stock, verification_status, created_at, updated_at
+            RETURNING id, seller_id, name, description, price, condition, stock, verification_status, authenticity_status, last_inspected_at, is_african_made, african_made_category, warranty_months, warranty_terms, created_at, updated_at
             "#
         )
         .bind(seller.id)
