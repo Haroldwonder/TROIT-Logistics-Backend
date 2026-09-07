@@ -44,6 +44,12 @@ pub struct Product {
     pub condition: String,
     pub stock: i32,
     pub verification_status: String,
+    pub authenticity_status: String,
+    pub last_inspected_at: Option<DateTime<Utc>>,
+    pub is_african_made: bool,
+    pub african_made_category: Option<String>,
+    pub warranty_months: i32,
+    pub warranty_terms: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -55,6 +61,10 @@ pub struct CreateProductRequest {
     pub price: f64,
     pub condition: Option<String>,
     pub stock: Option<i32>,
+    pub is_african_made: Option<bool>,
+    pub african_made_category: Option<String>,
+    pub warranty_months: Option<i32>,
+    pub warranty_terms: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +82,12 @@ pub struct ProductResponse {
     pub condition: String,
     pub stock: i32,
     pub verification_status: String,
+    pub authenticity_status: String,
+    pub last_inspected_at: Option<DateTime<Utc>>,
+    pub is_african_made: bool,
+    pub african_made_category: Option<String>,
+    pub warranty_months: i32,
+    pub warranty_terms: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -87,6 +103,12 @@ impl Product {
             condition: self.condition.clone(),
             stock: self.stock,
             verification_status: self.verification_status.clone(),
+            authenticity_status: self.authenticity_status.clone(),
+            last_inspected_at: self.last_inspected_at,
+            is_african_made: self.is_african_made,
+            african_made_category: self.african_made_category.clone(),
+            warranty_months: self.warranty_months,
+            warranty_terms: self.warranty_terms.clone(),
             created_at: self.created_at,
             updated_at: self.updated_at,
         }

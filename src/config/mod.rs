@@ -9,6 +9,14 @@ pub struct AppConfig {
     pub rust_log: String,
     pub jwt_secret: String,
     pub jwt_expiration_hours: i64,
+    pub stellar_rpc_url: String,
+    pub stellar_network_passphrase: String,
+    pub soroban_escrow_contract_id: String,
+    pub soroban_admin_secret_key: String,
+    pub soroban_service_secret_key: String,
+    pub soroban_buyer_secret_key: String,
+    pub soroban_seller_secret_key: String,
+    pub soroban_max_fee: u64,
 }
 
 impl AppConfig {
@@ -40,6 +48,27 @@ impl AppConfig {
             .parse::<i64>()
             .map_err(|e| format!("Invalid JWT_EXPIRATION_HOURS configuration: {}", e))?;
 
+        let stellar_rpc_url = env::var("STELLAR_RPC_URL")
+            .unwrap_or_else(|_| "https://soroban-testnet.stellar.org".to_string());
+
+        let stellar_network_passphrase = env::var("STELLAR_NETWORK_PASSPHRASE")
+            .unwrap_or_else(|_| "Test SDF Network ; September 2015".to_string());
+
+        let soroban_escrow_contract_id =
+            env::var("SOROBAN_ESCROW_CONTRACT_ID").unwrap_or_else(|_| {
+                "CBJB3R7RZSXXA5IDZRDMXEBRTWEZKRUSEVIA5C3M5D7F4H3QDM4MJ42P".to_string()
+            });
+
+        let soroban_admin_secret_key = env::var("SOROBAN_ADMIN_SECRET_KEY").unwrap_or_default();
+        let soroban_service_secret_key = env::var("SOROBAN_SERVICE_SECRET_KEY").unwrap_or_default();
+        let soroban_buyer_secret_key = env::var("SOROBAN_BUYER_SECRET_KEY").unwrap_or_default();
+        let soroban_seller_secret_key = env::var("SOROBAN_SELLER_SECRET_KEY").unwrap_or_default();
+
+        let soroban_max_fee = env::var("SOROBAN_MAX_FEE")
+            .unwrap_or_else(|_| "5000000".to_string())
+            .parse::<u64>()
+            .map_err(|e| format!("Invalid SOROBAN_MAX_FEE configuration: {}", e))?;
+
         Ok(Self {
             database_url,
             app_host,
@@ -47,6 +76,14 @@ impl AppConfig {
             rust_log,
             jwt_secret,
             jwt_expiration_hours,
+            stellar_rpc_url,
+            stellar_network_passphrase,
+            soroban_escrow_contract_id,
+            soroban_admin_secret_key,
+            soroban_service_secret_key,
+            soroban_buyer_secret_key,
+            soroban_seller_secret_key,
+            soroban_max_fee,
         })
     }
 }
