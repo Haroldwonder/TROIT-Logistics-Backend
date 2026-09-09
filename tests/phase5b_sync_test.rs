@@ -30,6 +30,8 @@ mod tests {
             stellar_rpc_url: "https://soroban-testnet.stellar.org".to_string(),
             stellar_network_passphrase: "Test SDF Network ; September 2015".to_string(),
             soroban_escrow_contract_id: contract_id.to_string(),
+            soroban_token_contract_id:
+                "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC".to_string(),
             soroban_admin_secret_key: "".to_string(),
             soroban_service_secret_key: "".to_string(),
             soroban_buyer_secret_key: "".to_string(),

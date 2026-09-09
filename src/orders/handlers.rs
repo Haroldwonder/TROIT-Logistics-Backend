@@ -156,7 +156,7 @@ pub async fn create_order_handler(
                 .map(|s| s.public_key().to_string())
                 .unwrap_or_default()
         };
-        let token_addr = state.config.soroban_escrow_contract_id.clone();
+        let token_addr = state.config.soroban_token_contract_id.clone();
 
         match state
             .blockchain

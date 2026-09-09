@@ -12,6 +12,7 @@ pub struct AppConfig {
     pub stellar_rpc_url: String,
     pub stellar_network_passphrase: String,
     pub soroban_escrow_contract_id: String,
+    pub soroban_token_contract_id: String,
     pub soroban_admin_secret_key: String,
     pub soroban_service_secret_key: String,
     pub soroban_buyer_secret_key: String,
@@ -59,6 +60,13 @@ impl AppConfig {
                 "CBJB3R7RZSXXA5IDZRDMXEBRTWEZKRUSEVIA5C3M5D7F4H3QDM4MJ42P".to_string()
             });
 
+        // Testnet native XLM Stellar Asset Contract, used as the escrow's payment
+        // token unless overridden. Verified against the deployed passphrase above.
+        let soroban_token_contract_id =
+            env::var("SOROBAN_TOKEN_CONTRACT_ID").unwrap_or_else(|_| {
+                "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC".to_string()
+            });
+
         let soroban_admin_secret_key = env::var("SOROBAN_ADMIN_SECRET_KEY").unwrap_or_default();
         let soroban_service_secret_key = env::var("SOROBAN_SERVICE_SECRET_KEY").unwrap_or_default();
         let soroban_buyer_secret_key = env::var("SOROBAN_BUYER_SECRET_KEY").unwrap_or_default();
@@ -79,6 +87,7 @@ impl AppConfig {
             stellar_rpc_url,
             stellar_network_passphrase,
             soroban_escrow_contract_id,
+            soroban_token_contract_id,
             soroban_admin_secret_key,
             soroban_service_secret_key,
             soroban_buyer_secret_key,
