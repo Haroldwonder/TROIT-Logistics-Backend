@@ -125,7 +125,12 @@ pub async fn create_order_handler(
     // Attempt Soroban create_escrow on Testnet if blockchain service executor is configured
     let updated_order: Order = if state.blockchain.executor().is_ok() {
         let buyer_pubkey = if !state.config.soroban_buyer_secret_key.is_empty() {
-            state.config.soroban_buyer_secret_key.clone()
+            crate::blockchain::signer::derive_public_key_from_secret(
+                &state.config.soroban_buyer_secret_key,
+            )
+            .map_err(|e| {
+                AppError::BlockchainError(format!("Invalid buyer signer configuration: {}", e))
+            })?
         } else {
             state
                 .blockchain
@@ -136,7 +141,12 @@ pub async fn create_order_handler(
                 .unwrap_or_default()
         };
         let seller_pubkey = if !state.config.soroban_seller_secret_key.is_empty() {
-            state.config.soroban_seller_secret_key.clone()
+            crate::blockchain::signer::derive_public_key_from_secret(
+                &state.config.soroban_seller_secret_key,
+            )
+            .map_err(|e| {
+                AppError::BlockchainError(format!("Invalid seller signer configuration: {}", e))
+            })?
         } else {
             state
                 .blockchain
@@ -1004,11 +1014,15 @@ pub async fn dispute_order_handler(
             .await?;
         r
     } else if state.blockchain.executor().is_ok() {
-        let caller_pubkey = if order.buyer_id == claims.sub {
-            state.config.soroban_buyer_secret_key.clone()
+        let caller_secret = if order.buyer_id == claims.sub {
+            &state.config.soroban_buyer_secret_key
         } else {
-            state.config.soroban_seller_secret_key.clone()
+            &state.config.soroban_seller_secret_key
         };
+        let caller_pubkey = crate::blockchain::signer::derive_public_key_from_secret(caller_secret)
+            .map_err(|e| {
+                AppError::BlockchainError(format!("Invalid caller signer configuration: {}", e))
+            })?;
         let exec_res = state
             .blockchain
             .execute_dispute_escrow(escrow_id as u64, &caller_pubkey)
