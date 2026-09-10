@@ -18,11 +18,12 @@ mod trust;
 mod utils;
 mod wishlist;
 
+use axum::http::{header, HeaderValue, Method};
 use config::AppConfig;
 use db::init_db_pool;
 use models::AppState;
 use routes::create_router;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -61,11 +62,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         blockchain,
     };
 
-    // 5. Configure CORS middleware for local frontend development
+    // 5. Configure CORS middleware — restricted to the production frontend origin
+    let frontend_origin: HeaderValue = "https://troit-logistics.vercel.app"
+        .parse()
+        .expect("invalid frontend origin");
+
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(frontend_origin)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
     // 6. Build Axum Router with middleware layers
     let app = create_router(state)

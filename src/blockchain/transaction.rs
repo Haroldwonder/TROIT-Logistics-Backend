@@ -82,6 +82,16 @@ impl TransactionExecutor {
         Ok(next)
     }
 
+    /// Drops the locally cached sequence number so the next call to
+    /// `get_next_sequence` re-fetches the account's real sequence from chain.
+    /// A rejected or unconfirmed submission may never have consumed the
+    /// sequence number it reserved (e.g. simulation failures, txBAD_SEQ,
+    /// txNO_ACCOUNT never reach the ledger), so continuing to increment the
+    /// local cache after a failure permanently desyncs it from the chain.
+    fn invalidate_cached_sequence(&self) {
+        self.cached_sequence.store(0, Ordering::SeqCst);
+    }
+
     pub fn parse_contract_address(contract_id: &str) -> Result<ScAddress, BlockchainError> {
         let decoded = Contract::from_string(contract_id.trim()).map_err(|e| {
             BlockchainError::InvalidConfig(format!("Invalid contract ID {}: {}", contract_id, e))
@@ -153,6 +163,39 @@ impl TransactionExecutor {
         auth_signer: Option<&SorobanSigner>,
     ) -> Result<ExecutionResult, BlockchainError> {
         let service_signer = self.service_signer()?;
+        let service_pubkey_for_seq = service_signer.public_key();
+        let seq_num = self.get_next_sequence(service_pubkey_for_seq).await?;
+
+        let result = self
+            .execute_contract_call_with_sequence(
+                function_name,
+                args,
+                escrow_id,
+                expected_amount,
+                auth_signer,
+                service_signer,
+                seq_num,
+            )
+            .await;
+
+        if result.is_err() {
+            self.invalidate_cached_sequence();
+        }
+
+        result
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn execute_contract_call_with_sequence(
+        &self,
+        function_name: &str,
+        args: Vec<ScVal>,
+        escrow_id: u64,
+        expected_amount: Option<f64>,
+        auth_signer: Option<&SorobanSigner>,
+        service_signer: &SorobanSigner,
+        seq_num: i64,
+    ) -> Result<ExecutionResult, BlockchainError> {
         let contract_addr = Self::parse_contract_address(&self.contract_id)?;
 
         let op = Self::build_invocation_op(
@@ -172,8 +215,6 @@ impl TransactionExecutor {
         let muxed_account = match service_account_id.0 {
             PublicKey::PublicKeyTypeEd25519(u256) => MuxedAccount::Ed25519(u256),
         };
-
-        let seq_num = self.get_next_sequence(service_pubkey).await?;
 
         let dummy_tx = Transaction {
             source_account: muxed_account.clone(),
