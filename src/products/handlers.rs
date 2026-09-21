@@ -196,9 +196,16 @@ pub async fn get_product_handler(
 /// Demonstration endpoint to mark a product as VERIFIED or REJECTED
 pub async fn verify_product_handler(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateVerificationRequest>,
 ) -> Result<Json<ApiResponse<ProductResponse>>, AppError> {
+    if claims.role != UserRole::Admin && claims.role != UserRole::FieldAgent {
+        return Err(AppError::Forbidden(
+            "Only admins or field agents can update product verification status".to_string(),
+        ));
+    }
+
     let new_status = payload.verification_status.to_uppercase();
     if new_status != "VERIFIED" && new_status != "REJECTED" && new_status != "PENDING" {
         return Err(AppError::ValidationError(

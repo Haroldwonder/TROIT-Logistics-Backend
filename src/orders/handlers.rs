@@ -81,32 +81,45 @@ pub async fn create_order_handler(
         ));
     }
 
-    // Check stock availability
-    if product.stock < quantity {
+    // Calculate total order amount
+    let total_amount = product.price * (quantity as f64);
+
+    // Atomic stock deduction preventing race conditions
+    let stock_res = sqlx::query(
+        "UPDATE products SET stock = stock - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND stock >= $1"
+    )
+    .bind(quantity)
+    .bind(product.id)
+    .execute(&state.db)
+    .await?;
+
+    if stock_res.rows_affected() == 0 {
         return Err(AppError::Conflict(format!(
             "Insufficient stock. Available: {}, Requested: {}",
             product.stock, quantity
         )));
     }
 
-    // Calculate total amount server-side
-    let total_amount = product.price * (quantity as f64);
-
-    // Deduct stock
-    sqlx::query("UPDATE products SET stock = stock - $1 WHERE id = $2")
-        .bind(quantity)
-        .bind(product.id)
-        .execute(&state.db)
-        .await?;
-
     // Generate unique numeric escrow_id sequence for Soroban escrow mapping
-    let escrow_id_row: (i64,) = sqlx::query_as("SELECT nextval('order_escrow_id_seq')::BIGINT")
+    let escrow_id_row: (i64,) = match sqlx::query_as("SELECT nextval('order_escrow_id_seq')::BIGINT")
         .fetch_one(&state.db)
-        .await?;
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            // Restore stock if sequence fetch fails
+            let _ = sqlx::query("UPDATE products SET stock = stock + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2")
+                .bind(quantity)
+                .bind(product.id)
+                .execute(&state.db)
+                .await;
+            return Err(err.into());
+        }
+    };
     let escrow_id = escrow_id_row.0;
 
     // Insert order with initial status PENDING, payment_status PENDING, escrow_state NONE
-    let order: Order = query_as::<_, Order>(
+    let order: Order = match query_as::<_, Order>(
         r#"
         INSERT INTO orders (buyer_id, seller_id, product_id, quantity, amount, status, payment_status, delivery_status, escrow_id, escrow_state)
         VALUES ($1, $2, $3, $4, $5, 'PENDING', 'PENDING', 'PENDING', $6, 'NONE')
@@ -120,7 +133,19 @@ pub async fn create_order_handler(
     .bind(total_amount)
     .bind(escrow_id)
     .fetch_one(&state.db)
-    .await?;
+    .await
+    {
+        Ok(ord) => ord,
+        Err(err) => {
+            // Restore stock if order insertion fails
+            let _ = sqlx::query("UPDATE products SET stock = stock + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2")
+                .bind(quantity)
+                .bind(product.id)
+                .execute(&state.db)
+                .await;
+            return Err(err.into());
+        }
+    };
 
     // Attempt Soroban create_escrow on Testnet if blockchain service executor is configured
     let updated_order: Order = if state.blockchain.executor().is_ok() {
@@ -183,14 +208,34 @@ pub async fn create_order_handler(
             .fetch_one(&state.db)
             .await?,
             Err(err) => {
+                // Mark order FAILED
                 let _ = sqlx::query(
-                    "UPDATE orders SET escrow_state = 'FAILED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+                    "UPDATE orders SET status = 'FAILED', escrow_state = 'FAILED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
                 )
                 .bind(order.id)
                 .execute(&state.db)
                 .await;
+
+                // Audit status lifecycle entry
+                let _ = record_order_status_history(
+                    &state.db,
+                    order.id,
+                    "ORDER_FAILED",
+                    Some(serde_json::json!({ "reason": err.to_string() })),
+                )
+                .await;
+
+                // Restore stock
+                let _ = sqlx::query(
+                    "UPDATE products SET stock = stock + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+                )
+                .bind(quantity)
+                .bind(product.id)
+                .execute(&state.db)
+                .await;
+
                 return Err(AppError::BlockchainError(format!(
-                    "Soroban escrow creation failed on Testnet: {}. Order state marked FAILED.",
+                    "Soroban escrow creation failed on Testnet: {}. Stock restored and order state marked FAILED.",
                     err
                 )));
             }
@@ -398,17 +443,29 @@ pub async fn list_orders_handler(
     State(state): State<AppState>,
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<ApiResponse<Vec<OrderResponse>>>, AppError> {
-    let orders: Vec<Order> = query_as::<_, Order>(
-        r#"
-        SELECT id, buyer_id, seller_id, product_id, quantity, amount, status, payment_status, delivery_status, escrow_id, escrow_state, blockchain_tx_hash, funding_tx_hash, release_tx_hash, refund_tx_hash, created_at, updated_at
-        FROM orders
-        WHERE buyer_id = $1 OR seller_id = $1
-        ORDER BY created_at DESC
-        "#
-    )
-    .bind(claims.sub)
-    .fetch_all(&state.db)
-    .await?;
+    let orders: Vec<Order> = if claims.role == UserRole::Admin {
+        query_as::<_, Order>(
+            r#"
+            SELECT id, buyer_id, seller_id, product_id, quantity, amount, status, payment_status, delivery_status, escrow_id, escrow_state, blockchain_tx_hash, funding_tx_hash, release_tx_hash, refund_tx_hash, created_at, updated_at
+            FROM orders
+            ORDER BY created_at DESC
+            "#
+        )
+        .fetch_all(&state.db)
+        .await?
+    } else {
+        query_as::<_, Order>(
+            r#"
+            SELECT id, buyer_id, seller_id, product_id, quantity, amount, status, payment_status, delivery_status, escrow_id, escrow_state, blockchain_tx_hash, funding_tx_hash, release_tx_hash, refund_tx_hash, created_at, updated_at
+            FROM orders
+            WHERE buyer_id = $1 OR seller_id = $1
+            ORDER BY created_at DESC
+            "#
+        )
+        .bind(claims.sub)
+        .fetch_all(&state.db)
+        .await?
+    };
 
     let response_data = orders.into_iter().map(|o| o.to_response()).collect();
 

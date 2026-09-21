@@ -1,4 +1,5 @@
 use crate::{
+    admin::handlers::{list_admin_sellers_handler, list_admin_users_handler},
     auth::handlers::{login_handler, logout_handler, me_handler, register_handler},
     inspections::handlers::{
         create_product_inspection_handler, get_product_inspection_handler,
@@ -67,7 +68,6 @@ pub fn create_router(state: AppState) -> Router {
     let public_products = Router::new()
         .route("/", get(list_products_handler))
         .route("/:id", get(get_product_handler))
-        .route("/:id/verify", patch(verify_product_handler))
         .route("/:id/inspection", get(get_product_inspection_handler))
         .route(
             "/:id/verification",
@@ -76,6 +76,7 @@ pub fn create_router(state: AppState) -> Router {
 
     let protected_products = Router::new()
         .route("/", post(create_product_handler))
+        .route("/:id/verify", patch(verify_product_handler))
         .route("/:id/inspection", post(create_product_inspection_handler))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
@@ -135,6 +136,12 @@ pub fn create_router(state: AppState) -> Router {
         .route("/:id/read", patch(mark_notification_read_handler))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
+    // 7. Admin routes (Protected, Server-side Admin role enforced)
+    let admin_routes = Router::new()
+        .route("/sellers", get(list_admin_sellers_handler))
+        .route("/users", get(list_admin_users_handler))
+        .layer(middleware::from_fn_with_state(state.clone(), require_auth));
+
     // Combine API v1 routes
     let api_v1 = Router::new()
         .nest("/auth", auth_routes)
@@ -143,6 +150,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/seller", seller_routes)
         .nest("/wishlist", wishlist_routes)
         .nest("/notifications", notification_routes)
+        .nest("/admin", admin_routes)
         .route("/seed", post(seed_demo_data_handler));
 
     // Root Router
