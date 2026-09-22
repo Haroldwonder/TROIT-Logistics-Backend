@@ -45,7 +45,9 @@ pub async fn register_handler(
 
     // Hash password with Argon2id
     let password_hash = AuthService::hash_password(&payload.password)?;
-    let role = payload.role.unwrap_or(UserRole::Buyer);
+    // Public registration always creates a Buyer account; elevated roles must be
+    // assigned separately by an authenticated administrator.
+    let role = UserRole::Buyer;
 
     // Insert user into PostgreSQL
     let user: User = query_as::<_, User>(

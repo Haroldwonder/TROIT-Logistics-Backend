@@ -9,7 +9,6 @@ pub struct RegisterRequest {
     pub password: String,
     pub full_name: String,
     pub phone_number: Option<String>,
-    pub role: Option<UserRole>,
 }
 
 #[derive(Debug, Deserialize)]
