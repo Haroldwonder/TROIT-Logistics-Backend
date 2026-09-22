@@ -1,7 +1,7 @@
 use crate::{
     errors::AppError,
     models::{wishlist::Wishlist, AppState, Claims, UserRole},
-    products::models::Product,
+    products::{handlers::fetch_product_images, models::Product},
     wishlist::models::WishlistItemResponse,
 };
 use axum::{
@@ -61,7 +61,7 @@ pub async fn add_to_wishlist_handler(
         r#"
         SELECT id, seller_id, name, description, price, condition, stock, verification_status,
                authenticity_status, last_inspected_at, is_african_made, african_made_category,
-               warranty_months, warranty_terms, created_at, updated_at
+               warranty_months, warranty_terms, is_archived, archived_at, created_at, updated_at
         FROM products
         WHERE id = $1
         "#,
@@ -70,6 +70,8 @@ pub async fn add_to_wishlist_handler(
     .fetch_optional(&state.db)
     .await?
     .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    let images = fetch_product_images(&state.db, product.id).await?;
 
     let item: Wishlist = query_as::<_, Wishlist>(
         r#"
@@ -91,7 +93,7 @@ pub async fn add_to_wishlist_handler(
             id: item.id,
             buyer_id: item.buyer_id,
             product_id: item.product_id,
-            product: Some(product.to_response()),
+            product: Some(product.to_response(images)),
             created_at: item.created_at,
         }),
     }))
@@ -148,10 +150,10 @@ pub async fn list_wishlist_handler(
     .fetch_all(&state.db)
     .await?;
 
-    let response: Vec<WishlistItemResponse> = records
-        .into_iter()
-        .map(|r| {
-            let product = r.prod_id.map(|pid| Product {
+    let mut response: Vec<WishlistItemResponse> = Vec::with_capacity(records.len());
+    for r in records {
+        let product_opt = if let Some(pid) = r.prod_id {
+            let p = Product {
                 id: pid,
                 seller_id: r.prod_seller_id.unwrap(),
                 name: r.prod_name.unwrap(),
@@ -168,19 +170,25 @@ pub async fn list_wishlist_handler(
                 african_made_category: r.prod_african_made_category,
                 warranty_months: r.prod_warranty_months.unwrap_or(0),
                 warranty_terms: r.prod_warranty_terms,
+                is_archived: false,
+                archived_at: None,
                 created_at: r.prod_created_at.unwrap(),
                 updated_at: r.prod_updated_at.unwrap(),
-            });
+            };
+            let images = fetch_product_images(&state.db, p.id).await?;
+            Some(p.to_response(images))
+        } else {
+            None
+        };
 
-            WishlistItemResponse {
-                id: r.id,
-                buyer_id: r.buyer_id,
-                product_id: r.product_id,
-                product: product.map(|p| p.to_response()),
-                created_at: r.created_at,
-            }
-        })
-        .collect();
+        response.push(WishlistItemResponse {
+            id: r.id,
+            buyer_id: r.buyer_id,
+            product_id: r.product_id,
+            product: product_opt,
+            created_at: r.created_at,
+        });
+    }
 
     Ok(Json(ApiResponse {
         success: true,

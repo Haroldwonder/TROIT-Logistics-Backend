@@ -125,7 +125,7 @@ pub async fn seed_demo_data_handler(
         .fetch_one(&state.db)
         .await?;
 
-        seeded_products.push(product.to_response());
+        seeded_products.push(product.to_response(vec![]));
     }
 
     Ok(Json(SeedResponse {

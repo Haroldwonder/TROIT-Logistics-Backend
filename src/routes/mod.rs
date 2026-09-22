@@ -18,7 +18,10 @@ use crate::{
         update_order_status_handler,
     },
     products::handlers::{
-        create_product_handler, get_product_handler, list_products_handler, verify_product_handler,
+        archive_product_handler, create_product_handler, delete_product_image_handler,
+        get_product_handler, list_products_handler, reorder_product_images_handler,
+        restore_product_handler, update_product_handler, update_stock_handler,
+        upload_product_image_handler, verify_product_handler,
     },
     seed::handlers::seed_demo_data_handler,
     seller::handlers::{
@@ -35,8 +38,9 @@ use crate::{
     },
 };
 use axum::{
+    extract::DefaultBodyLimit,
     middleware,
-    routing::{delete, get, patch, post},
+    routing::{delete, get, patch, post, put},
     Json, Router,
 };
 use serde_json::{json, Value};
@@ -52,30 +56,47 @@ pub async fn health_handler() -> Json<Value> {
 
 /// Constructs complete Axum application router hierarchy
 pub fn create_router(state: AppState) -> Router {
-    // 1. Auth routes
-    let public_auth = Router::new()
+    // 1. Auth routes (Public & Protected)
+    let auth_routes = Router::new()
         .route("/register", post(register_handler))
         .route("/login", post(login_handler))
-        .route("/logout", post(logout_handler));
+        .route(
+            "/logout",
+            post(logout_handler).layer(middleware::from_fn_with_state(state.clone(), require_auth)),
+        )
+        .route(
+            "/me",
+            get(me_handler).layer(middleware::from_fn_with_state(state.clone(), require_auth)),
+        );
 
-    let protected_auth = Router::new()
-        .route("/me", get(me_handler))
-        .layer(middleware::from_fn_with_state(state.clone(), require_auth));
-
-    let auth_routes = Router::new().merge(public_auth).merge(protected_auth);
-
-    // 2. Product & Inspection routes
+    // 2. Product routes (Public & Protected)
     let public_products = Router::new()
         .route("/", get(list_products_handler))
         .route("/:id", get(get_product_handler))
-        .route("/:id/inspection", get(get_product_inspection_handler))
         .route(
-            "/:id/verification",
+            "/:id/inspection/latest",
+            get(get_product_inspection_handler),
+        )
+        .route(
+            "/:id/verification-summary",
             get(get_product_verification_summary_handler),
         );
 
     let protected_products = Router::new()
         .route("/", post(create_product_handler))
+        .route("/:id", patch(update_product_handler))
+        .route("/:id", delete(archive_product_handler))
+        .route("/:id/stock", patch(update_stock_handler))
+        .route("/:id/archive", patch(restore_product_handler))
+        .route(
+            "/:id/images",
+            post(upload_product_image_handler).layer(DefaultBodyLimit::max(25 * 1024 * 1024)),
+        )
+        .route(
+            "/:id/images/:image_id",
+            delete(delete_product_image_handler),
+        )
+        .route("/:id/images/reorder", put(reorder_product_images_handler))
         .route("/:id/verify", patch(verify_product_handler))
         .route("/:id/inspection", post(create_product_inspection_handler))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
