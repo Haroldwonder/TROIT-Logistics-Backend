@@ -25,9 +25,8 @@ impl AppConfig {
         // Attempt to load .env file if available
         let _ = dotenvy::dotenv();
 
-        let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
-            "postgres://postgres:postgres@localhost:5432/troit_logistics".to_string()
-        });
+        let database_url = env::var("DATABASE_URL")
+            .map_err(|_| "DATABASE_URL environment variable must be set".to_string())?;
 
         let app_host = env::var("APP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
 
@@ -40,9 +39,8 @@ impl AppConfig {
         let rust_log = env::var("RUST_LOG")
             .unwrap_or_else(|_| "info,troit_logistics_backend=debug".to_string());
 
-        let jwt_secret = env::var("JWT_SECRET").unwrap_or_else(|_| {
-            "troit_local_dev_jwt_secret_key_change_in_prod_1234567890".to_string()
-        });
+        let jwt_secret = env::var("JWT_SECRET")
+            .map_err(|_| "JWT_SECRET environment variable must be set".to_string())?;
 
         let jwt_expiration_hours = env::var("JWT_EXPIRATION_HOURS")
             .unwrap_or_else(|_| "24".to_string())
@@ -106,6 +104,12 @@ mod tests {
     fn test_port_resolution_priority() {
         let orig_port = env::var("PORT").ok();
         let orig_app_port = env::var("APP_PORT").ok();
+        let orig_database_url = env::var("DATABASE_URL").ok();
+        let orig_jwt_secret = env::var("JWT_SECRET").ok();
+
+        // Required configuration must be present for from_env() to succeed.
+        env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+        env::set_var("JWT_SECRET", "test_jwt_secret_for_unit_tests_only");
 
         // 1. PORT takes priority over APP_PORT and default
         env::set_var("PORT", "9000");
@@ -135,6 +139,16 @@ mod tests {
             env::set_var("APP_PORT", val);
         } else {
             env::remove_var("APP_PORT");
+        }
+        if let Some(val) = orig_database_url {
+            env::set_var("DATABASE_URL", val);
+        } else {
+            env::remove_var("DATABASE_URL");
+        }
+        if let Some(val) = orig_jwt_secret {
+            env::set_var("JWT_SECRET", val);
+        } else {
+            env::remove_var("JWT_SECRET");
         }
     }
 }

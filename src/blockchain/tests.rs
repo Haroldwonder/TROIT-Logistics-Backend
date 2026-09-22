@@ -5,8 +5,16 @@ use crate::config::AppConfig;
 use crate::errors::AppError;
 use types::EscrowState;
 
+/// Populates the environment variables `AppConfig::from_env` requires so
+/// tests can construct a config without a real `.env` file present.
+fn set_required_test_env() {
+    std::env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+    std::env::set_var("JWT_SECRET", "test_jwt_secret_for_unit_tests_only");
+}
+
 #[test]
 fn test_blockchain_service_config_parsing() {
+    set_required_test_env();
     let mut config = AppConfig::from_env().unwrap();
     config.stellar_rpc_url = "https://soroban-testnet.stellar.org".to_string();
     config.soroban_escrow_contract_id =
@@ -25,6 +33,7 @@ fn test_blockchain_service_config_parsing() {
 
 #[test]
 fn test_missing_escrow_contract_id_returns_error() {
+    set_required_test_env();
     let mut config = AppConfig::from_env().unwrap();
     config.soroban_escrow_contract_id = "".to_string();
 

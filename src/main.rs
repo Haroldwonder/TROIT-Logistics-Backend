@@ -24,6 +24,10 @@ use config::AppConfig;
 use db::init_db_pool;
 use models::AppState;
 use routes::create_router;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -79,12 +83,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
-    // 6. Build Axum Router with middleware layers
+    // 6. Configure per-IP rate limiting — protects auth, order and blockchain
+    // endpoints from brute-force and abuse. Returns HTTP 429 when exceeded.
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_second(2)
+            .burst_size(20)
+            .finish()
+            .expect("failed to build rate limiter configuration"),
+    );
+
+    let governor_limiter = governor_conf.limiter().clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(60));
+        governor_limiter.retain_recent();
+    });
+
+    // 7. Build Axum Router with middleware layers
     let app = create_router(state)
         .layer(cors)
+        .layer(GovernorLayer {
+            config: governor_conf,
+        })
         .layer(TraceLayer::new_for_http());
 
-    // 7. Bind TCP listener and serve
+    // 8. Bind TCP listener and serve
     let bind_address = format!("{}:{}", config.app_host, config.app_port);
     let listener = tokio::net::TcpListener::bind(&bind_address).await?;
 
@@ -97,7 +120,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bind_address
     );
 
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

@@ -1,11 +1,14 @@
 # Generated Rust Build Artifacts
 /target
-Cargo.lock
 
 # Environment & Secret Files
 .env
 .env.local
 .env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Database Data Directories (Local Development)
 .pg_data/
