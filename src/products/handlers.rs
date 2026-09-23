@@ -69,6 +69,26 @@ pub async fn create_product_handler(
         ));
     }
 
+    // Sellers must be VERIFIED by an administrator before listing products
+    if claims.role == UserRole::Seller {
+        let profile_status: Option<(String,)> =
+            sqlx::query_as("SELECT verification_status FROM seller_profiles WHERE user_id = $1")
+                .bind(claims.sub)
+                .fetch_optional(&state.db)
+                .await?;
+
+        let is_verified = match profile_status {
+            Some((status,)) => status.to_uppercase() == "VERIFIED",
+            None => false,
+        };
+
+        if !is_verified {
+            return Err(AppError::Forbidden(
+                "Product listing is restricted until seller verification is approved by an administrator".to_string(),
+            ));
+        }
+    }
+
     let clean_name = payload.name.trim();
     let clean_desc = payload.description.trim();
 

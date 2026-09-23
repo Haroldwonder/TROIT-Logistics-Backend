@@ -1,13 +1,14 @@
 use crate::{
     admin::models::{
-        AdminSellerItemResponse, AdminSellerListResponse, AdminSellerQuery, AdminUserItemResponse,
-        AdminUserListResponse, AdminUserQuery,
+        AdminSellerItemResponse, AdminSellerListResponse, AdminSellerQuery,
+        AdminUpdateSellerVerificationRequest, AdminUserItemResponse, AdminUserListResponse,
+        AdminUserQuery,
     },
     errors::AppError,
-    models::{AppState, Claims, UserRole},
+    models::{seller::SellerProfile, AppState, Claims, UserRole},
 };
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     Extension, Json,
 };
 use serde::Serialize;
@@ -59,7 +60,10 @@ pub async fn list_admin_sellers_handler(
     let offset = (page - 1) * limit;
 
     let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s.trim()));
-    let status_filter = query.verification_status.as_ref().map(|s| s.trim().to_uppercase());
+    let status_filter = query
+        .verification_status
+        .as_ref()
+        .map(|s| s.trim().to_uppercase());
 
     // Fetch total matching sellers count
     let total: i64 = sqlx::query_scalar(
@@ -144,6 +148,93 @@ pub async fn list_admin_sellers_handler(
             page,
             limit,
             total_pages,
+        }),
+    }))
+}
+
+/// PATCH /api/v1/admin/sellers/:seller_id/verification
+/// Admin-only endpoint to approve, reject, or update seller verification status
+pub async fn update_admin_seller_verification_handler(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    Path(seller_id): Path<uuid::Uuid>,
+    Json(payload): Json<AdminUpdateSellerVerificationRequest>,
+) -> Result<Json<ApiResponse<AdminSellerItemResponse>>, AppError> {
+    if claims.role != UserRole::Admin {
+        return Err(AppError::Forbidden(
+            "Access denied: Admin role required".to_string(),
+        ));
+    }
+
+    let status_clean = payload.status.trim().to_uppercase();
+    if status_clean != "VERIFIED"
+        && status_clean != "REJECTED"
+        && status_clean != "UNDER_REVIEW"
+        && status_clean != "PENDING"
+    {
+        return Err(AppError::ValidationError(
+            "Invalid verification status. Allowed values: VERIFIED, REJECTED, UNDER_REVIEW, PENDING".to_string(),
+        ));
+    }
+
+    // Update verification status for seller profile matching seller_id or user_id
+    let updated_profile: Option<SellerProfile> = sqlx::query_as::<_, SellerProfile>(
+        r#"
+        UPDATE seller_profiles
+        SET verification_status = $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2 OR user_id = $2
+        RETURNING id, user_id, store_name, store_address, trust_level, seller_grade, successful_transactions, fulfillment_rate, verification_status, created_at, updated_at
+        "#
+    )
+    .bind(&status_clean)
+    .bind(seller_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let profile = updated_profile
+        .ok_or_else(|| AppError::NotFound("Seller profile not found".to_string()))?;
+
+    // Fetch user details for response
+    let user_row = sqlx::query(
+        r#"
+        SELECT full_name, email, phone_number,
+               (SELECT COUNT(*) FROM products p WHERE p.seller_id = u.id) AS total_products,
+               (SELECT COUNT(*) FROM orders o WHERE o.seller_id = u.id) AS total_orders
+        FROM users u
+        WHERE u.id = $1
+        "#,
+    )
+    .bind(profile.user_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    let user_full_name: String = user_row.try_get("full_name")?;
+    let user_email: String = user_row.try_get("email")?;
+    let user_phone: Option<String> = user_row.try_get("phone_number")?;
+    let total_products: i64 = user_row.try_get("total_products")?;
+    let total_orders: i64 = user_row.try_get("total_orders")?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        message: format!("Seller verification status updated to {}", status_clean),
+        data: Some(AdminSellerItemResponse {
+            seller_id: profile.id,
+            user_id: profile.user_id,
+            store_name: profile.store_name,
+            store_address: profile.store_address,
+            trust_level: profile.trust_level,
+            seller_grade: profile.seller_grade,
+            successful_transactions: profile.successful_transactions,
+            fulfillment_rate: profile.fulfillment_rate,
+            verification_status: profile.verification_status,
+            user_full_name,
+            user_email,
+            user_phone,
+            total_products,
+            total_orders,
+            created_at: profile.created_at,
+            updated_at: profile.updated_at,
         }),
     }))
 }

@@ -155,6 +155,18 @@ async fn create_user(pool: &PgPool, role: UserRole) -> (Uuid, String) {
     .await
     .unwrap();
 
+    if role == UserRole::Seller {
+        let seller_profile_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO seller_profiles (id, user_id, verification_status) VALUES ($1, $2, 'VERIFIED')",
+        )
+        .bind(seller_profile_id)
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
     let token = AuthService::generate_token(id, &email, role, JWT_SECRET, 24).unwrap();
     (id, token)
 }

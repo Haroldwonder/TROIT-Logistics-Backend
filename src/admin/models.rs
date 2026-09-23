@@ -11,6 +11,11 @@ pub struct AdminSellerQuery {
     pub verification_status: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AdminUpdateSellerVerificationRequest {
+    pub status: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AdminSellerItemResponse {
     pub seller_id: Uuid,

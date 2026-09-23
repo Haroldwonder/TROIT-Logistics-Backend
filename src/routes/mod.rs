@@ -1,5 +1,8 @@
 use crate::{
-    admin::handlers::{list_admin_sellers_handler, list_admin_users_handler},
+    admin::handlers::{
+        list_admin_sellers_handler, list_admin_users_handler,
+        update_admin_seller_verification_handler,
+    },
     auth::handlers::{login_handler, logout_handler, me_handler, register_handler},
     inspections::handlers::{
         create_product_inspection_handler, get_product_inspection_handler,
@@ -160,6 +163,10 @@ pub fn create_router(state: AppState) -> Router {
     // 7. Admin routes (Protected, Server-side Admin role enforced)
     let admin_routes = Router::new()
         .route("/sellers", get(list_admin_sellers_handler))
+        .route(
+            "/sellers/:seller_id/verification",
+            patch(update_admin_seller_verification_handler),
+        )
         .route("/users", get(list_admin_users_handler))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 

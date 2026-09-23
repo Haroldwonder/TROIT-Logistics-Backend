@@ -116,32 +116,17 @@ fn test_admin_authorization_matrix_roles() {
     let seller_id = Uuid::new_v4();
     let admin_id = Uuid::new_v4();
 
-    let buyer_token = AuthService::generate_token(
-        buyer_id,
-        "buyer@troit.test",
-        UserRole::Buyer,
-        secret,
-        24,
-    )
-    .expect("Buyer token fail");
+    let buyer_token =
+        AuthService::generate_token(buyer_id, "buyer@troit.test", UserRole::Buyer, secret, 24)
+            .expect("Buyer token fail");
 
-    let seller_token = AuthService::generate_token(
-        seller_id,
-        "seller@troit.test",
-        UserRole::Seller,
-        secret,
-        24,
-    )
-    .expect("Seller token fail");
+    let seller_token =
+        AuthService::generate_token(seller_id, "seller@troit.test", UserRole::Seller, secret, 24)
+            .expect("Seller token fail");
 
-    let admin_token = AuthService::generate_token(
-        admin_id,
-        "admin@troit.test",
-        UserRole::Admin,
-        secret,
-        24,
-    )
-    .expect("Admin token fail");
+    let admin_token =
+        AuthService::generate_token(admin_id, "admin@troit.test", UserRole::Admin, secret, 24)
+            .expect("Admin token fail");
 
     let buyer_claims = AuthService::verify_token(&buyer_token, secret).unwrap();
     let seller_claims = AuthService::verify_token(&seller_token, secret).unwrap();
