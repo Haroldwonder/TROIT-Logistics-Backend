@@ -62,6 +62,7 @@ async fn test_admin_verification_authorization_matrix() {
         s3_secret_access_key: "secret".to_string(),
         storage_public_url: "https://cdn.test.com".to_string(),
         max_image_size_mb: 5,
+        admin_bootstrap_secret: None,
     };
 
     let blockchain = Arc::new(

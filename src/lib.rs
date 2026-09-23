@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod auth;
 pub mod blockchain;
+pub mod bootstrap;
 pub mod config;
 pub mod db;
 pub mod errors;

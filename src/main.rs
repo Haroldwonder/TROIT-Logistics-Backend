@@ -1,6 +1,7 @@
 mod admin;
 mod auth;
 mod blockchain;
+mod bootstrap;
 mod config;
 mod db;
 mod errors;

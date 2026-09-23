@@ -46,6 +46,7 @@ mod tests {
             s3_secret_access_key: "".to_string(),
             storage_public_url: "".to_string(),
             max_image_size_mb: 5,
+            admin_bootstrap_secret: None,
         });
         config.soroban_escrow_contract_id = contract_id.to_string();
         BlockchainService::new(&config).expect("BlockchainService creation should succeed")

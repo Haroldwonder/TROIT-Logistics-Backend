@@ -101,6 +101,7 @@ async fn setup_test_app() -> Option<(axum::Router, PgPool, Arc<TestStorageServic
         s3_secret_access_key: "secret".to_string(),
         storage_public_url: "https://cdn.test.com".to_string(),
         max_image_size_mb: 5,
+        admin_bootstrap_secret: None,
     };
 
     let test_storage = Arc::new(TestStorageService::new());
