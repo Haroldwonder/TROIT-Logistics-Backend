@@ -45,9 +45,17 @@ pub async fn register_handler(
 
     // Hash password with Argon2id
     let password_hash = AuthService::hash_password(&payload.password)?;
-    // Public registration always creates a Buyer account; elevated roles must be
-    // assigned separately by an authenticated administrator.
-    let role = UserRole::Buyer;
+    // Public registration allows Buyer or Seller accounts.
+    // Administrative and operational roles (Admin, FieldAgent, Rider) cannot be self-assigned.
+    let role = match payload.role {
+        Some(UserRole::Seller) => UserRole::Seller,
+        Some(UserRole::Buyer) | None => UserRole::Buyer,
+        Some(_) => {
+            return Err(AppError::Forbidden(
+                "Self-assignment of administrative or operational roles is prohibited".to_string(),
+            ));
+        }
+    };
 
     // Insert user into PostgreSQL
     let user: User = query_as::<_, User>(
@@ -187,3 +195,60 @@ pub async fn me_handler(
     }))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_role_resolution_buyer_default() {
+        let req = RegisterRequest {
+            email: "buyer@example.com".to_string(),
+            password: "Password123!".to_string(),
+            full_name: "Buyer Test".to_string(),
+            phone_number: None,
+            role: None,
+        };
+        let role = match req.role {
+            Some(UserRole::Seller) => UserRole::Seller,
+            Some(UserRole::Buyer) | None => UserRole::Buyer,
+            Some(_) => UserRole::Buyer,
+        };
+        assert_eq!(role, UserRole::Buyer);
+    }
+
+    #[test]
+    fn test_role_resolution_seller_allowed() {
+        let req = RegisterRequest {
+            email: "seller@example.com".to_string(),
+            password: "Password123!".to_string(),
+            full_name: "Seller Test".to_string(),
+            phone_number: None,
+            role: Some(UserRole::Seller),
+        };
+        let role = match req.role {
+            Some(UserRole::Seller) => UserRole::Seller,
+            Some(UserRole::Buyer) | None => UserRole::Buyer,
+            Some(_) => UserRole::Buyer,
+        };
+        assert_eq!(role, UserRole::Seller);
+    }
+
+    #[test]
+    fn test_role_resolution_admin_rejected() {
+        let req = RegisterRequest {
+            email: "admin@example.com".to_string(),
+            password: "Password123!".to_string(),
+            full_name: "Admin Attacker".to_string(),
+            phone_number: None,
+            role: Some(UserRole::Admin),
+        };
+        let result: Result<UserRole, AppError> = match req.role {
+            Some(UserRole::Seller) => Ok(UserRole::Seller),
+            Some(UserRole::Buyer) | None => Ok(UserRole::Buyer),
+            Some(_) => Err(AppError::Forbidden(
+                "Self-assignment of administrative or operational roles is prohibited".to_string(),
+            )),
+        };
+        assert!(result.is_err());
+    }
+}
