@@ -27,6 +27,7 @@ pub struct AppConfig {
     pub storage_public_url: String,
     pub max_image_size_mb: usize,
     pub cors_allowed_origins: Vec<String>,
+    pub admin_bootstrap_secret: Option<String>,
 }
 
 impl AppConfig {
@@ -107,6 +108,11 @@ impl AppConfig {
             .filter(|s| !s.is_empty())
             .collect::<Vec<String>>();
 
+        let admin_bootstrap_secret = env::var("ADMIN_BOOTSTRAP_SECRET")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
         Ok(Self {
             database_url,
             app_host,
@@ -132,6 +138,7 @@ impl AppConfig {
             storage_public_url,
             max_image_size_mb,
             cors_allowed_origins,
+            admin_bootstrap_secret,
         })
     }
 }

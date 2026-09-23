@@ -4,6 +4,7 @@ use crate::{
         update_admin_seller_verification_handler,
     },
     auth::handlers::{login_handler, logout_handler, me_handler, register_handler},
+    bootstrap::handlers::admin_bootstrap_handler,
     inspections::handlers::{
         create_product_inspection_handler, get_product_inspection_handler,
         get_product_verification_summary_handler,
@@ -179,7 +180,8 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/wishlist", wishlist_routes)
         .nest("/notifications", notification_routes)
         .nest("/admin", admin_routes)
-        .route("/seed", post(seed_demo_data_handler));
+        .route("/seed", post(seed_demo_data_handler))
+        .route("/bootstrap/admin", post(admin_bootstrap_handler));
 
     // Root Router
     Router::new()
