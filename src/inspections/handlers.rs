@@ -51,7 +51,7 @@ pub async fn create_product_inspection_handler(
         r#"
         SELECT id, seller_id, name, description, price, condition, stock, verification_status,
                authenticity_status, last_inspected_at, is_african_made, african_made_category,
-               warranty_months, warranty_terms, created_at, updated_at
+               warranty_months, warranty_terms, is_archived, archived_at, created_at, updated_at
         FROM products
         WHERE id = $1
         "#,
@@ -179,7 +179,7 @@ pub async fn get_product_verification_summary_handler(
         r#"
         SELECT id, seller_id, name, description, price, condition, stock, verification_status,
                authenticity_status, last_inspected_at, is_african_made, african_made_category,
-               warranty_months, warranty_terms, created_at, updated_at
+               warranty_months, warranty_terms, is_archived, archived_at, created_at, updated_at
         FROM products
         WHERE id = $1
         "#,

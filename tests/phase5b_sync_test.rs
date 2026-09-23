@@ -27,16 +27,25 @@ mod tests {
             rust_log: "info".to_string(),
             jwt_secret: "test_secret".to_string(),
             jwt_expiration_hours: 24,
+            cors_allowed_origins: vec!["*".to_string()],
             stellar_rpc_url: "https://soroban-testnet.stellar.org".to_string(),
             stellar_network_passphrase: "Test SDF Network ; September 2015".to_string(),
             soroban_escrow_contract_id: contract_id.to_string(),
-            soroban_token_contract_id:
-                "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC".to_string(),
+            soroban_token_contract_id: "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+                .to_string(),
             soroban_admin_secret_key: "".to_string(),
             soroban_service_secret_key: "".to_string(),
             soroban_buyer_secret_key: "".to_string(),
             soroban_seller_secret_key: "".to_string(),
             soroban_max_fee: 5000000,
+            storage_provider: "r2".to_string(),
+            s3_bucket_name: "".to_string(),
+            s3_endpoint: "".to_string(),
+            s3_region: "auto".to_string(),
+            s3_access_key_id: "".to_string(),
+            s3_secret_access_key: "".to_string(),
+            storage_public_url: "".to_string(),
+            max_image_size_mb: 5,
         });
         config.soroban_escrow_contract_id = contract_id.to_string();
         BlockchainService::new(&config).expect("BlockchainService creation should succeed")

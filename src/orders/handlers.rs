@@ -60,12 +60,19 @@ pub async fn create_order_handler(
 
     // Fetch product
     let product: Product = query_as::<_, Product>(
-        "SELECT id, seller_id, name, description, price, condition, stock, verification_status, authenticity_status, last_inspected_at, is_african_made, african_made_category, warranty_months, warranty_terms, created_at, updated_at FROM products WHERE id = $1"
+        "SELECT id, seller_id, name, description, price, condition, stock, verification_status, authenticity_status, last_inspected_at, is_african_made, african_made_category, warranty_months, warranty_terms, is_archived, archived_at, created_at, updated_at FROM products WHERE id = $1"
     )
     .bind(payload.product_id)
     .fetch_optional(&state.db)
     .await?
     .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    // Check product is not archived
+    if product.is_archived {
+        return Err(AppError::BadRequest(
+            "Archived products cannot be ordered".to_string(),
+        ));
+    }
 
     // Check product is verified for buyer purchase
     if product.verification_status != "VERIFIED" {
@@ -101,9 +108,11 @@ pub async fn create_order_handler(
     }
 
     // Generate unique numeric escrow_id sequence for Soroban escrow mapping
-    let escrow_id_row: (i64,) = match sqlx::query_as("SELECT nextval('order_escrow_id_seq')::BIGINT")
-        .fetch_one(&state.db)
-        .await
+    let escrow_id_row: (i64,) = match sqlx::query_as(
+        "SELECT nextval('order_escrow_id_seq')::BIGINT",
+    )
+    .fetch_one(&state.db)
+    .await
     {
         Ok(res) => res,
         Err(err) => {

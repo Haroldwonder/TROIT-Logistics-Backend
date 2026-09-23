@@ -18,6 +18,15 @@ pub struct AppConfig {
     pub soroban_buyer_secret_key: String,
     pub soroban_seller_secret_key: String,
     pub soroban_max_fee: u64,
+    pub storage_provider: String,
+    pub s3_bucket_name: String,
+    pub s3_endpoint: String,
+    pub s3_region: String,
+    pub s3_access_key_id: String,
+    pub s3_secret_access_key: String,
+    pub storage_public_url: String,
+    pub max_image_size_mb: usize,
+    pub cors_allowed_origins: Vec<String>,
 }
 
 impl AppConfig {
@@ -75,6 +84,29 @@ impl AppConfig {
             .parse::<u64>()
             .map_err(|e| format!("Invalid SOROBAN_MAX_FEE configuration: {}", e))?;
 
+        let storage_provider = env::var("STORAGE_PROVIDER").unwrap_or_else(|_| "r2".to_string());
+        let s3_bucket_name = env::var("S3_BUCKET_NAME").unwrap_or_default();
+        let s3_endpoint = env::var("S3_ENDPOINT").unwrap_or_default();
+        let s3_region = env::var("S3_REGION").unwrap_or_else(|_| "auto".to_string());
+        let s3_access_key_id = env::var("S3_ACCESS_KEY_ID").unwrap_or_default();
+        let s3_secret_access_key = env::var("S3_SECRET_ACCESS_KEY").unwrap_or_default();
+        let storage_public_url = env::var("STORAGE_PUBLIC_URL").unwrap_or_default();
+
+        let max_image_size_mb = env::var("MAX_IMAGE_SIZE_MB")
+            .unwrap_or_else(|_| "5".to_string())
+            .parse::<usize>()
+            .map_err(|e| format!("Invalid MAX_IMAGE_SIZE_MB configuration: {}", e))?;
+
+        let cors_allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
+            .or_else(|_| env::var("FRONTEND_URL"))
+            .unwrap_or_else(|_| {
+                "https://troit-logistics.vercel.app,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173".to_string()
+            })
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<String>>();
+
         Ok(Self {
             database_url,
             app_host,
@@ -91,6 +123,15 @@ impl AppConfig {
             soroban_buyer_secret_key,
             soroban_seller_secret_key,
             soroban_max_fee,
+            storage_provider,
+            s3_bucket_name,
+            s3_endpoint,
+            s3_region,
+            s3_access_key_id,
+            s3_secret_access_key,
+            storage_public_url,
+            max_image_size_mb,
+            cors_allowed_origins,
         })
     }
 }

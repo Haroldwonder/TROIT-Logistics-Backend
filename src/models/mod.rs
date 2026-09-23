@@ -12,12 +12,15 @@ pub mod seller;
 pub mod subscription;
 pub mod wishlist;
 
+use crate::services::storage::SharedStorageService;
+
 /// Application Shared State
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
     pub config: AppConfig,
     pub blockchain: SharedBlockchainService,
+    pub storage: SharedStorageService,
 }
 
 /// Platform user roles supported by TROIT Logistics

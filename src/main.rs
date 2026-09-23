@@ -56,24 +56,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. Connect to PostgreSQL and run automatic SQLx migrations
     let db = init_db_pool(&config.database_url).await?;
 
-    // 4. Initialize Blockchain Service
+    // 4. Initialize Blockchain Service & Storage Service
     let blockchain_service = blockchain::BlockchainService::new(&config)?;
     let blockchain = std::sync::Arc::new(blockchain_service);
+    let storage = services::storage::create_storage_service(&config);
 
     // 5. Create AppState
     let state = AppState {
         db,
         config: config.clone(),
         blockchain,
+        storage,
     };
 
-    // 5. Configure CORS middleware — restricted to the production frontend origin
-    let frontend_origin: HeaderValue = "https://troit-logistics.vercel.app"
-        .parse()
-        .expect("invalid frontend origin");
+    // 5. Configure CORS middleware — supports production and configured local origins
+    let allowed_origins: Vec<HeaderValue> = config
+        .cors_allowed_origins
+        .iter()
+        .filter_map(|origin_str| origin_str.parse::<HeaderValue>().ok())
+        .collect();
 
     let cors = CorsLayer::new()
-        .allow_origin(frontend_origin)
+        .allow_origin(allowed_origins)
         .allow_methods([
             Method::GET,
             Method::POST,
