@@ -285,7 +285,18 @@ pub async fn fund_order_handler(
 
     let req = payload.map(|Json(p)| p).unwrap_or_default();
 
-    let tx_hash = if let Some(hash) = req.tx_hash {
+    let tx_hash = if let Some(signed_xdr) = req.signed_tx_xdr.filter(|s| !s.trim().is_empty()) {
+        // Buyer's own wallet already built and signed this transaction; submit and verify it.
+        state
+            .blockchain
+            .submit_signed_transaction(
+                &signed_xdr,
+                "fund_escrow",
+                escrow_id as u64,
+                Some(order.amount),
+            )
+            .await?
+    } else if let Some(hash) = req.tx_hash {
         if hash.trim().is_empty()
             || hash.starts_with("tx-fund-")
             || hash.starts_with("tx-release-")
@@ -729,7 +740,13 @@ pub async fn confirm_delivery_handler(
 
     let req = payload.map(|Json(p)| p).unwrap_or_default();
 
-    let tx_hash = if let Some(hash) = req.tx_hash {
+    let tx_hash = if let Some(signed_xdr) = req.signed_tx_xdr.filter(|s| !s.trim().is_empty()) {
+        // Buyer's own wallet already built and signed this transaction; submit and verify it.
+        state
+            .blockchain
+            .submit_signed_transaction(&signed_xdr, "release_escrow", escrow_id as u64, None)
+            .await?
+    } else if let Some(hash) = req.tx_hash {
         if hash.trim().is_empty()
             || hash.starts_with("tx-fund-")
             || hash.starts_with("tx-release-")
@@ -901,7 +918,17 @@ pub async fn refund_order_handler(
         .and_then(|r| r.reason.clone())
         .unwrap_or_else(|| "Order refund requested".to_string());
 
-    let tx_hash = if let Some(r) = req.as_ref().and_then(|r| r.tx_hash.clone()) {
+    let tx_hash = if let Some(signed_xdr) = req
+        .as_ref()
+        .and_then(|r| r.signed_tx_xdr.clone())
+        .filter(|s| !s.trim().is_empty())
+    {
+        // Buyer/seller's own wallet already built and signed this transaction; submit and verify it.
+        state
+            .blockchain
+            .submit_signed_transaction(&signed_xdr, "refund_escrow", escrow_id as u64, None)
+            .await?
+    } else if let Some(r) = req.as_ref().and_then(|r| r.tx_hash.clone()) {
         if r.starts_with("tx-") {
             return Err(AppError::BadRequest(
                 "Mock transaction hashes are not allowed".to_string(),
@@ -1002,7 +1029,17 @@ pub async fn dispute_order_handler(
         .ok_or_else(|| AppError::BadRequest("Order lacks valid escrow_id mapping".to_string()))?;
 
     let req = payload.map(|Json(p)| p);
-    let tx_hash = if let Some(r) = req.as_ref().and_then(|r| r.tx_hash.clone()) {
+    let tx_hash = if let Some(signed_xdr) = req
+        .as_ref()
+        .and_then(|r| r.signed_tx_xdr.clone())
+        .filter(|s| !s.trim().is_empty())
+    {
+        // Buyer/seller's own wallet already built and signed this transaction; submit and verify it.
+        state
+            .blockchain
+            .submit_signed_transaction(&signed_xdr, "dispute_escrow", escrow_id as u64, None)
+            .await?
+    } else if let Some(r) = req.as_ref().and_then(|r| r.tx_hash.clone()) {
         if r.starts_with("tx-") {
             return Err(AppError::BadRequest(
                 "Mock transaction hashes are not allowed".to_string(),
@@ -1111,7 +1148,18 @@ pub async fn resolve_dispute_handler(
         .escrow_id
         .ok_or_else(|| AppError::BadRequest("Order lacks valid escrow_id mapping".to_string()))?;
 
-    let tx_hash = if let Some(r) = payload.tx_hash.clone() {
+    let tx_hash = if let Some(signed_xdr) = payload
+        .signed_tx_xdr
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+    {
+        // Admin-coordinated resolution already built and signed by the releasing/refunding party's
+        // wallet; submit and verify it.
+        state
+            .blockchain
+            .submit_signed_transaction(&signed_xdr, "resolve_dispute", escrow_id as u64, None)
+            .await?
+    } else if let Some(r) = payload.tx_hash.clone() {
         if r.starts_with("tx-") {
             return Err(AppError::BadRequest(
                 "Mock transaction hashes are not allowed".to_string(),

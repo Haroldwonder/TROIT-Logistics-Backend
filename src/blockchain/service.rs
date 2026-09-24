@@ -274,6 +274,62 @@ impl BlockchainService {
             .await
     }
 
+    /// Submits a transaction that was already built and signed client-side (e.g. by a
+    /// buyer/seller's own wallet), then verifies it confirmed on-chain and matches the
+    /// expected contract call before the caller updates any order state. This lets the
+    /// escrow endpoints accept wallet-signed transactions without the backend ever
+    /// holding the user's signing key.
+    #[instrument(skip(self, signed_tx_xdr))]
+    pub async fn submit_signed_transaction(
+        &self,
+        signed_tx_xdr: &str,
+        expected_function: &str,
+        expected_escrow_id: u64,
+        expected_amount: Option<f64>,
+    ) -> Result<String, BlockchainError> {
+        if signed_tx_xdr.trim().is_empty() {
+            return Err(BlockchainError::InvalidConfig(
+                "signed_tx_xdr must not be empty".to_string(),
+            ));
+        }
+
+        info!(
+            "Submitting client-signed transaction for expected_func={} expected_escrow_id={}",
+            expected_function, expected_escrow_id
+        );
+
+        let send_res = self.rpc_client.send_transaction(signed_tx_xdr).await?;
+        let hash = send_res.hash;
+
+        let confirm_status = self
+            .rpc_client
+            .poll_transaction_confirmation(&hash, 15, 1000)
+            .await?;
+        if confirm_status != TransactionStatus::Success {
+            return Err(BlockchainError::TransactionFailed(format!(
+                "Submitted transaction {} did not confirm successfully (status {:?})",
+                hash, confirm_status
+            )));
+        }
+
+        let verified_status = self
+            .verify_transaction_semantics(
+                &hash,
+                expected_function,
+                expected_escrow_id,
+                expected_amount,
+            )
+            .await?;
+        if verified_status != TransactionStatus::Success {
+            return Err(BlockchainError::TransactionFailed(format!(
+                "Transaction {} failed semantic verification",
+                hash
+            )));
+        }
+
+        Ok(hash)
+    }
+
     #[instrument(skip(self))]
     pub async fn verify_transaction_confirmation(
         &self,
