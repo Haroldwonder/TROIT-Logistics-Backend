@@ -49,6 +49,24 @@ pub async fn health_handler() -> Json<Value> {
     }))
 }
 
+/// GET /api/v1/blockchain/config
+/// Publishes the public Soroban coordinates (contract IDs, RPC URL, network passphrase)
+/// a wallet-enabled frontend needs to build and simulate escrow transactions itself
+/// before sending them to a wallet for signing. Contains no secrets.
+pub async fn blockchain_config_handler(
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> Json<Value> {
+    Json(json!({
+        "success": true,
+        "data": {
+            "escrow_contract_id": state.config.soroban_escrow_contract_id,
+            "token_contract_id": state.config.soroban_token_contract_id,
+            "rpc_url": state.config.stellar_rpc_url,
+            "network_passphrase": state.config.stellar_network_passphrase,
+        }
+    }))
+}
+
 /// Constructs complete Axum application router hierarchy
 pub fn create_router(state: AppState) -> Router {
     // 1. Auth routes
@@ -143,6 +161,7 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/seller", seller_routes)
         .nest("/wishlist", wishlist_routes)
         .nest("/notifications", notification_routes)
+        .route("/blockchain/config", get(blockchain_config_handler))
         .route("/seed", post(seed_demo_data_handler));
 
     // Root Router

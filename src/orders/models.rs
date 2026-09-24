@@ -61,18 +61,21 @@ pub struct ConfirmDeliveryRequest {
 pub struct RefundOrderRequest {
     pub reason: Option<String>,
     pub tx_hash: Option<String>,
+    pub signed_tx_xdr: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DisputeOrderRequest {
     pub reason: String,
     pub tx_hash: Option<String>,
+    pub signed_tx_xdr: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ResolveDisputeRequest {
     pub release_to_seller: bool,
     pub tx_hash: Option<String>,
+    pub signed_tx_xdr: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
